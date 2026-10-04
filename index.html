@@ -132,7 +132,7 @@ async function win(){
 function fmt(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 
 // ---- storage: Firebase Realtime Database (REST, no login). Falls back to this device if URL not set.
-const DB_URL="PASTE_YOUR_DATABASE_URL_HERE"; // e.g. https://your-project-default-rtdb.firebaseio.com
+const DB_URL="https://protocol-aadff-default-rtdb.firebaseio.com"; // e.g. https://your-project-default-rtdb.firebaseio.com
 const live=()=>DB_URL.startsWith('https://');
 const slug=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'team';
 let poll=null;
