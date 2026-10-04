@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Protocol</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
+<style>
+:root{--bg:#0b1510;--panel:#112019;--ink:#b8f0c0;--dim:#6f9b78;--line:#2a4a35;--rec:#ff4a3d}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:"Share Tech Mono",ui-monospace,Menlo,monospace}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+.screen{display:none;min-height:100vh;padding:28px 20px 40px;max-width:640px;margin:0 auto;flex-direction:column;justify-content:center;gap:18px}
+.screen.on{display:flex}
+.rec{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:14px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--rec);animation:b 1.2s steps(2) infinite}
+@keyframes b{50%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+h1{font-size:clamp(40px,12vw,68px);line-height:1;margin:6px 0 0;letter-spacing:.12em;font-weight:400;text-shadow:0 0 14px rgba(120,255,160,.35)}
+h2{font-size:24px;margin:0;font-weight:400;letter-spacing:.08em}
+.sub{color:var(--rec);letter-spacing:.2em;font-size:15px}
+p{margin:0;line-height:1.6;color:var(--ink);max-width:56ch}
+.dim{color:var(--dim)}
+input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:18px;padding:14px;border-radius:2px;letter-spacing:.1em}
+input:focus,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+button.go{background:var(--ink);color:#07110b;border:0;font:inherit;font-size:18px;padding:14px;letter-spacing:.15em;cursor:pointer;border-radius:2px}
+button.link{background:none;border:0;color:var(--dim);font:inherit;text-decoration:underline;cursor:pointer;padding:6px 0;align-self:flex-start}
+.err{color:var(--rec);min-height:22px}
+.shake{animation:s .35s}
+@keyframes s{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.hud{display:flex;justify-content:space-between;color:var(--dim)}
+.board{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:1px solid var(--line)}
+.t{position:absolute;width:25%;height:25%;border:1px solid rgba(0,0,0,.55);padding:0;cursor:pointer;background-image:var(--img);background-size:400% 400%;transition:left .12s,top .12s}
+.board.done .t{border-color:transparent}
+.msg{min-height:24px;color:var(--ink)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:400}
+tr.me td{color:#fff;background:var(--panel)}
+td.r{width:36px;color:var(--dim)}
+</style></head><body>
+
+<section class="screen on" id="s1">
+  <div class="rec"><span class="dot"></span>REC 00:01:23 &nbsp; LAB</div>
+  <h1>THE PROTOCOL</h1>
+  <div class="sub">RESTRICTED ARCHIVE</div>
+  <p>Authentication required. This archive was sealed after the last lab session ended. Every terminal is logged. Every attempt is recorded.</p>
+  <p class="dim">Enter your team name, then the passcode you were given. One wrong guess is noted, not forgiven.</p>
+  <input id="team" placeholder="Team name" maxlength="24" autocomplete="off">
+  <input id="pass" type="password" placeholder="Passcode" autocomplete="off">
+  <div class="err" id="err"></div>
+  <button class="go" id="enter">AUTHENTICATE</button>
+  <button class="link" id="seeLb">view leaderboard</button>
+</section>
+
+<section class="screen" id="s2">
+  <div class="rec"><span class="dot"></span>ACCESS GRANTED</div>
+  <h2>Rebuild the frame</h2>
+  <p class="dim">The footage was scrambled. Slide the pieces into the empty slot to restore the image.</p>
+  <div class="hud"><span id="mv">Moves 0</span><span id="tm">00:00</span></div>
+  <div class="board" id="board"></div>
+  <div class="msg" id="msg"></div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="rec"><span class="dot"></span>ARCHIVE LOG</div>
+  <h2>Leaderboard</h2>
+  <p class="dim">Teams ranked by who finished first.</p>
+  <table><thead><tr><th></th><th>Team</th><th>Time</th><th>Finished</th></tr></thead><tbody id="rows"></tbody></table>
+  <button class="link" id="back">back</button>
+</section>
+
+<script>
+const IMG="lab.jpg"; // keep lab.jpg in the same folder as this file
+const $=id=>document.getElementById(id);
+let team="",startedAt=0,timer=null,moves=0,tiles=[],rows=[];
+function show(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$('s'+n).classList.add('on');window.scrollTo(0,0)}
+
+// ---- page 1
+function auth(){
+  const t=$('team').value.trim(),p=$('pass').value.trim().toLowerCase();
+  if(!t){$('err').textContent='Team name required.';return}
+  if(p!=='nightfall'){$('err').textContent='Access denied. Attempt logged.';const b=$('pass');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');return}
+  team=t;$('err').textContent='';show(2);startPuzzle();
+}
+$('enter').onclick=auth;
+$('pass').onkeydown=$('team').onkeydown=e=>{if(e.key==='Enter')auth()};
+$('seeLb').onclick=()=>{show(3);loadLb()};
+$('back').onclick=()=>show(1);
+
+// ---- page 2
+const N=4,EMPTY=15;
+function startPuzzle(){
+  tiles=[...Array(16).keys()];
+  let e=15,last=-1;
+  for(let i=0;i<4;i++){
+    const r=Math.floor(e/N),c=e%N,opts=[];
+    if(r>0)opts.push(e-N);if(r<N-1)opts.push(e+N);if(c>0)opts.push(e-1);if(c<N-1)opts.push(e+1);
+    const o=opts.filter(x=>x!==last),n=o[Math.floor(Math.random()*o.length)];
+    [tiles[e],tiles[n]]=[tiles[n],tiles[e]];last=e;e=n;
+  }
+  if(tiles.every((v,i)=>v===i))return startPuzzle();
+  moves=0;$('mv').textContent='Moves 0';$('msg').textContent='';$('board').classList.remove('done');
+  startedAt=Date.now();clearInterval(timer);
+  timer=setInterval(()=>{$('tm').textContent=fmt(Date.now()-startedAt)},500);
+  draw();
+}
+function draw(){
+  const b=$('board');b.innerHTML='';
+  tiles.forEach((v,pos)=>{
+    if(v===EMPTY)return;
+    const el=document.createElement('button');el.className='t';el.setAttribute('aria-label','Piece '+(v+1));
+    el.style.cssText=`--img:url(${IMG});left:${(pos%N)*25}%;top:${Math.floor(pos/N)*25}%;background-position:${(v%N)*100/3}% ${Math.floor(v/N)*100/3}%`;
+    el.onclick=()=>move(pos);b.appendChild(el);
+  });
+}
+function move(pos){
+  const e=tiles.indexOf(EMPTY),d=Math.abs(pos-e);
+  if(!((d===N)||(d===1&&Math.floor(pos/N)===Math.floor(e/N))))return;
+  [tiles[pos],tiles[e]]=[tiles[e],tiles[pos]];moves++;$('mv').textContent='Moves '+moves;draw();
+  if(tiles.every((v,i)=>v===i))win();
+}
+async function win(){
+  clearInterval(timer);
+  const ms=Date.now()-startedAt;
+  const b=$('board');b.classList.add('done');
+  b.innerHTML=`<div class="t" style="--img:url(${IMG});left:0;top:0;width:100%;height:100%;background-size:100% 100%;cursor:default"></div>`;
+  $('msg').textContent='Archive unlocked. Logging your time...';
+  await save({team,ms,moves,finishedAt:Date.now()});
+  $('msg').innerHTML='Archive unlocked in '+fmt(ms)+'. <button class="link" id="goLb">See the leaderboard</button>';
+  $('goLb').onclick=()=>{show(3);loadLb()};
+  setTimeout(()=>{if($('s2').classList.contains('on')){show(3);loadLb()}},3500);
+}
+function fmt(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+
+// ---- storage: Firebase Realtime Database (REST, no login). Falls back to this device if URL not set.
+const DB_URL="PASTE_YOUR_DATABASE_URL_HERE"; // e.g. https://your-project-default-rtdb.firebaseio.com
+const live=()=>DB_URL.startsWith('https://');
+const slug=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'team';
+let poll=null;
+async function save(r){
+  if(live()){
+    try{
+      const u=DB_URL+'/leaderboard/'+slug(r.team)+'.json';
+      const ex=await (await fetch(u)).json();
+      if(!ex){await fetch(u,{method:'PUT',body:JSON.stringify({team:r.team,ms:r.ms,moves:r.moves,finishedAt:{'.sv':'timestamp'}})})}
+      return;
+    }catch(e){}
+  }
+  try{const a=JSON.parse(localStorage.getItem('protocol_lb')||'[]');if(!a.some(x=>slug(x.team)===slug(r.team))){a.push(r);localStorage.setItem('protocol_lb',JSON.stringify(a))}}catch(e){}
+}
+async function loadLb(){
+  clearInterval(poll);
+  if(!live())return local();
+  const pull=async()=>{try{const o=await (await fetch(DB_URL+'/leaderboard.json')).json()||{};rows=Object.values(o).sort((a,b)=>a.finishedAt-b.finishedAt);render()}catch(e){local()}};
+  await pull();poll=setInterval(()=>{if($('s3').classList.contains('on'))pull()},4000);
+}
+function local(){try{rows=JSON.parse(localStorage.getItem('protocol_lb')||'[]').sort((a,b)=>a.finishedAt-b.finishedAt)}catch(e){rows=[]}render()}
+function render(){
+  const tb=$('rows');tb.innerHTML='';
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="dim">No team has cleared the archive yet.</td></tr>';return}
+  rows.forEach((r,i)=>{
+    const tr=document.createElement('tr');if(slug(r.team)===slug(team))tr.className='me';
+    const cells=[i+1,r.team,fmt(r.ms),new Date(r.finishedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})];
+    cells.forEach((c,j)=>{const td=document.createElement('td');if(j===0)td.className='r';td.textContent=c;tr.appendChild(td)});
+    tb.appendChild(tr);
+  });
+}
+</script></body></html>
